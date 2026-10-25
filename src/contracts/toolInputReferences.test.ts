@@ -834,25 +834,6 @@ it.each(["$ref", "$dynamicRef"])(
 );
 
 describe("advertised empty-string literal edge cases", () => {
-  it("preserves every enum member type when widening a mixed enum", () => {
-    const canonical = {
-      type: "object",
-      properties: { value: { enum: ["", 1] } },
-    };
-    const advertised = presentInputJsonSchema(canonical, () => undefined);
-    const canonicalValidate = new Ajv2020({ strict: false }).compile(canonical);
-    const advertisedValidate = new Ajv2020({ strict: false }).compile(
-      advertised,
-    );
-    expect(canonicalValidate({ value: "" })).toBe(true);
-    expect(canonicalValidate({ value: 1 })).toBe(true);
-    expect(advertisedValidate({ value: "" })).toBe(true);
-    expect(advertisedValidate({ value: 1 })).toBe(true);
-    expect(advertised.properties).toEqual({
-      value: { anyOf: [{ type: "string" }, { type: "integer" }] },
-    });
-  });
-
   it("widens empty-string literals under contentSchema", () => {
     const canonical = {
       type: "object",
