@@ -14,7 +14,15 @@ import {
 } from "./contracts/toolSchemaMetadata.js";
 import type { CompactInputSchemaPresentation } from "./contracts/compactInputSchema.js";
 import { presentAdvertisedInputProfile } from "./contracts/inputSchemaPresentation.js";
-import type { McpOutputSchemaProfile } from "./config/mcpOutputSchemaProfile.js";
+import {
+  presentAdvertisedOutputSchema,
+  type CompactOutputSchemaPresentation,
+} from "./contracts/compactOutputSchema.js";
+import {
+  COMPACT_OUTPUT_SCHEMA_BUDGET_BYTES,
+  compactPresentationForMcpOutputSchemaProfile,
+  type McpOutputSchemaProfile,
+} from "./config/mcpOutputSchemaProfile.js";
 import {
   COMPACT_INPUT_SCHEMA_BUDGET_BYTES,
   compactPresentationForMcpInputSchemaProfile,
@@ -55,15 +63,28 @@ const createToolCatalog = (contracts: readonly ToolContract[]) =>
 const presentToolCatalog = (
   catalog: ReturnType<typeof createToolCatalog>,
   presentation: CompactInputSchemaPresentation | undefined,
+  outputPresentation: CompactOutputSchemaPresentation | undefined = undefined,
 ) =>
-  presentation === undefined
+  presentation === undefined && outputPresentation === undefined
     ? catalog
     : catalog.map((tool) => ({
         ...tool,
-        input_schema: presentAdvertisedInputProfile(
-          tool.input_schema,
-          presentation,
-        ),
+        ...(presentation === undefined
+          ? {}
+          : {
+              input_schema: presentAdvertisedInputProfile(
+                tool.input_schema,
+                presentation,
+              ),
+            }),
+        ...(outputPresentation === undefined
+          ? {}
+          : {
+              output_schema: presentAdvertisedOutputSchema(
+                tool.output_schema,
+                outputPresentation,
+              ),
+            }),
       }));
 
 const createPromptCatalog = (contracts: readonly PromptContract[]) =>
@@ -122,6 +143,7 @@ export const createCatalogDigests = (
     presentToolCatalog(
       createToolCatalog(sortByName(contracts)),
       compactPresentation,
+      compactPresentationForMcpOutputSchemaProfile(outputSchemaProfile),
     ),
     createPromptCatalog(promptContracts),
     outputSchemaProfile,
@@ -135,7 +157,7 @@ export type CatalogDigestProfiles = Readonly<
   >
 >;
 
-/** Build-time identities share schema conversion across the four supported profiles. */
+/** Build-time identities share schema conversion across the six supported profiles. */
 export const createCatalogDigestProfiles = (
   contracts: readonly ToolContract[] = TOOL_CONTRACTS,
   promptContracts: readonly PromptContract[] = PROMPT_CONTRACTS,
@@ -145,8 +167,16 @@ export const createCatalogDigestProfiles = (
     budgetBytes: COMPACT_INPUT_SCHEMA_BUDGET_BYTES,
   });
   const prompts = createPromptCatalog(promptContracts);
+  const compactOutput: CompactOutputSchemaPresentation = {
+    budgetBytes: COMPACT_OUTPUT_SCHEMA_BUDGET_BYTES,
+  };
   const outputProfiles = (catalog: typeof full) => ({
     full: digestCatalogs(catalog, prompts, "full"),
+    compact: digestCatalogs(
+      presentToolCatalog(catalog, undefined, compactOutput),
+      prompts,
+      "compact",
+    ),
     off: digestCatalogs(catalog, prompts, "off"),
   });
   return { full: outputProfiles(full), compact: outputProfiles(compact) };
