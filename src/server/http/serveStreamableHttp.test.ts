@@ -284,6 +284,27 @@ it("refuses foreign Host headers on a loopback bind and frees the port on close"
   });
 });
 
+it("refuses a non-loopback bind without an operator host allowlist as a typed listen error", async () => {
+  const refused = start({ host: "0.0.0.0" });
+  await expect(refused).rejects.toBeInstanceOf(StreamableHttpListenError);
+  await expect(refused).rejects.toThrow(/MCP_ALLOWED_HOSTS/u);
+});
+
+it("gates a non-loopback bind on the operator allowlist", async () => {
+  const { served } = await start({
+    host: "0.0.0.0",
+    allowedHosts: ["127.0.0.1"],
+  });
+  const url = new URL(served.url);
+  url.hostname = "127.0.0.1";
+  const { client } = await connect(url.toString());
+  await expect(echo(client, "allowed")).resolves.toEqual([
+    { type: "text", text: "allowed" },
+  ]);
+  await client.close();
+  await expectForeignHostRefused(url);
+});
+
 it("reports a port that cannot be bound as a typed listen error naming the cause", async () => {
   const { served } = await start();
   const failed = serveStreamableHttp({
