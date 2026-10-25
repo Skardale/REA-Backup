@@ -751,9 +751,8 @@ const advertiseAndEnforceItemSelectorCollectionConstraints =
         view: { kind: "item", collection, selector },
       });
       const nodeId = `jag_node_${"b".repeat(64)}`;
-      // Collection-specific selector constraints must survive JSON Schema
-      // conversion: the advertised schema rejects exactly what runtime
-      // input validation rejects.
+      // The full advertisement is fitted to the client size limit, so it can
+      // accept cross-collection selectors that canonical validation rejects.
       const invalid: ReadonlyArray<readonly [string, unknown]> = [
         ["modules", { index: 0 }],
         ["modules", { name: "entry" }],
@@ -774,10 +773,13 @@ const advertiseAndEnforceItemSelectorCollectionConstraints =
         expect(contract.inputSchema.safeParse(input).success, label).toBe(
           false,
         );
-        expect(validate(input), `advertised schema rejects ${label}`).toBe(
-          false,
-        );
+        expect(validate(input), `fitted schema accepts ${label}`).toBe(true);
       }
+      const unknownCollection = itemInput("widgets", { index: 0 });
+      expect(contract.inputSchema.safeParse(unknownCollection).success).toBe(
+        false,
+      );
+      expect(validate(unknownCollection)).toBe(false);
       for (const [collection, selector] of valid) {
         const input = itemInput(collection, selector);
         const label = `${collection}/${Object.keys(selector as object)[0]}`;
@@ -792,7 +794,7 @@ const advertiseAndEnforceItemSelectorCollectionConstraints =
   };
 
 it(
-  "advertises and enforces the item selector collection constraints",
+  "keeps canonical item selector constraints after fitting the advertisement",
   advertiseAndEnforceItemSelectorCollectionConstraints,
 );
 
