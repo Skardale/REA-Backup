@@ -72,6 +72,44 @@ export const normalizeArtifactPath = (input: string): string => {
   return normalized;
 };
 
+/**
+ * Name the original decoded spelling when Unicode NFC normalization changed a
+ * logical path. Inventory identity keeps the NFC form; the limitation preserves
+ * the source spelling that normalization replaced. Returns undefined when the
+ * spelling is already NFC (a trailing-slash trim is structural, not a spelling
+ * change, and is not reported here). The label follows the entry kind so a
+ * folder on disk or a ZIP directory entry is never called an archive member,
+ * and an entry's NFC spelling keeps its trailing slash whatever its kind
+ * (the logical path trims it as a structural step, not a spelling change;
+ * a trailing-slash file member reported as the slashless NFC form would
+ * attribute the slash removal to Unicode normalization).
+ */
+export const unicodeNormalizationLimitation = (
+  original: string,
+  normalized: string,
+  kind: ArtifactEntry["kind"] = "file",
+): string | undefined => {
+  if (original.normalize("NFC") === original) return undefined;
+  const label =
+    kind === "directory"
+      ? "Directory path"
+      : kind === "symlink"
+        ? "Symlink path"
+        : kind === "slice"
+          ? "Archive slice path"
+          : kind === "metadata"
+            ? "Metadata path"
+            : "File path";
+  const displayNormalized = original.endsWith("/")
+    ? original.normalize("NFC")
+    : normalized;
+  return (
+    `${label} ${JSON.stringify(original)} was Unicode-normalized ` +
+    `to NFC ${JSON.stringify(displayNormalized)} for its logical path; the original ` +
+    `decoded spelling is preserved in this limitation.`
+  );
+};
+
 /** Reject exact and same-spelling prefix collisions. Case-distinct names stay distinct. */
 export class ArtifactPathRegistry {
   readonly #root: PathTrieNode = { kind: undefined, children: new Map() };
